@@ -22,27 +22,33 @@ struct probe_struct {
 	int done;
 	int final;
 	sockaddr_any res;
-	double send_time;
+	double send_time;/*探测报文发送时时间*/
 	double recv_time;
 	int recv_ttl;
 	int sk;
-	int seq;
+	int seq;/*探测序列*/
 	char *ext;
 	char err_str[16];	/*  assume enough   */
 };
 typedef struct probe_struct probe;
 
 
+/*定义不同的traceroute module*/
 struct tr_module_struct {
-	struct tr_module_struct *next;
-	const char *name;
-	int (*init) (const sockaddr_any *dest,
-				unsigned int port_seq, size_t *packet_len);
+	struct tr_module_struct *next;/*用于注册时串连*/
+	const char *name;/*模块名称*/
+	/*module初始化*/
+	int (*init) (const sockaddr_any *dest/*探测的目的地址*/,
+				unsigned int port_seq/*探测端口*/, size_t *packet_len/*探测报文数据长度*/);
+	/*探测报文发送*/
 	void (*send_probe) (probe *pb, int ttl);
+	/*fd收到事件，进行处理*/
 	void (*recv_probe) (int fd, int revents);
 	void (*expire_probe) (probe *pb);
+	/*模块自定义的选项*/
 	CLIF_option *options;	/*  per module options, if any   */
 	int one_per_time;	/*  no simultaneous probes   */
+	/*报文头部长度*/
 	size_t header_len;	/*  additional header length (aka for udp)   */
 };
 typedef struct tr_module_struct tr_module;
@@ -98,6 +104,7 @@ uint16_t in_csum (const void *ptr, size_t len);
 void tr_register_module (tr_module *module);
 const tr_module *tr_get_module (const char *name);
 
+/*注册不同的module*/
 #define TR_MODULE(MOD)	\
 static void __init_ ## MOD (void) __attribute__ ((constructor));	\
 static void __init_ ## MOD (void) {	\

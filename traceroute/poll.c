@@ -18,7 +18,7 @@
 static struct pollfd *pfd = NULL;
 static unsigned int num_polls = 0;
 
-
+/*向poll数组中添加fd，设置其关心的事件*/
 void add_poll (int fd, int events) {
 	int i;
 
@@ -33,7 +33,7 @@ void add_poll (int fd, int events) {
 	pfd[i].events = events;
 }
 
-
+/*移除poll数组中指定fd*/
 void del_poll (int fd) {
 	int i;
 
@@ -62,7 +62,7 @@ static int cleanup_polls (void) {
 	return i;
 }
 
-
+/*执行poll监听，收到事件后，执行相应的回调*/
 void do_poll (double timeout, void (*callback) (int fd, int revents)) {
 	int nfds;
 	int msecs = ceil (timeout * 1000);
@@ -70,6 +70,7 @@ void do_poll (double timeout, void (*callback) (int fd, int revents)) {
 	while ((nfds = cleanup_polls ()) > 0) {
 	    int i, n;
 
+	    /*执行poll*/
 	    n = poll (pfd, nfds, msecs);
 
 	    if (n <= 0) {
@@ -78,6 +79,7 @@ void do_poll (double timeout, void (*callback) (int fd, int revents)) {
 		error ("poll");
 	    }
 
+	    /*执行回调*/
 	    for (i = 0; n && i < num_polls; i++) {
 		if (pfd[i].revents) {
 		    callback (pfd[i].fd, pfd[i].revents);

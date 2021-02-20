@@ -15,12 +15,14 @@
 
 static tr_module *base = NULL;
 
+/*模板注册*/
 void tr_register_module (tr_module *ops) {
 
 	ops->next = base;
 	base = ops;
 }
 
+/*按名称查找对应module对应的ops*/
 const tr_module *tr_get_module (const char *name) {
 	const tr_module *ops;
 

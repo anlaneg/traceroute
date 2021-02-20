@@ -33,6 +33,7 @@ static unsigned int dest_port = 0;
 static int raw_sk = -1;
 static int last_ttl = 0;
 
+/*记录探测报文*/
 static uint8_t buf[1024];	    /*  enough, enough...  */
 static size_t csum_len = 0;
 static struct tcphdr *th = NULL;
@@ -95,6 +96,7 @@ static char *names_by_flags (unsigned int flags) {
 	return  strdup (str);
 }
 
+/*设置tcp的选项标记*/
 static int set_tcp_flag (CLIF_option *optn, char *arg) {
 	int i;
 
@@ -126,6 +128,7 @@ static int set_flag (CLIF_option *optn, char *arg) {
 	return 0;
 }
 
+/*tcp选项*/
 static CLIF_option tcp_options[] = {
 	{ 0, "syn", 0, "Set tcp flag SYN (default if no other "
 			"tcp flags specified)", set_tcp_flag, 0, 0, 0 },
@@ -189,8 +192,8 @@ static int check_sysctl (const char *name) {
 }
 
 
-static int tcp_init (const sockaddr_any *dest,
-			    unsigned int port_seq, size_t *packet_len_p) {
+static int tcp_init (const sockaddr_any *dest/*目的地址*/,
+			    unsigned int port_seq/*目的端口*/, size_t *packet_len_p/*数据长度*/) {
 	int af = dest->sa.sa_family;
 	sockaddr_any src;
 	int mtu;
@@ -202,26 +205,31 @@ static int tcp_init (const sockaddr_any *dest,
 	dest_addr = *dest;
 	dest_addr.sin.sin_port = 0;	/*  raw sockets can be confused   */
 
+	/*如未指定port,默认使用80端口*/
 	if (!port_seq)  port_seq = DEF_TCP_PORT;
 	dest_port = htons (port_seq);
 
 
 	/*  Create raw socket for tcp   */
-
+	/*创建raw tcp socket*/
 	raw_sk = socket (af, SOCK_RAW, IPPROTO_TCP);
 	if (raw_sk < 0)
 		error_or_perm ("socket");
 
+	/*设置raw socket*/
 	tune_socket (raw_sk);	    /*  including bind, if any   */
 
+	/*与对端进行连接*/
 	if (connect (raw_sk, &dest_addr.sa, sizeof (dest_addr)) < 0)
 		error ("connect");
 
+	/*取本端源地址*/
 	len = sizeof (src);
 	if (getsockname (raw_sk, &src.sa, &len) < 0)
 		error ("getsockname");
 
 
+	/*取本端mtu*/
 	len = sizeof (mtu);
 	if (getsockopt (raw_sk, af == AF_INET ? SOL_IP : SOL_IPV6,
 				af == AF_INET ? IP_MTU : IPV6_MTU,
@@ -233,6 +241,7 @@ static int tcp_init (const sockaddr_any *dest,
 	mtu -= sizeof (struct tcphdr);
 
 
+	/*2.6.25版本后，可连接*/
 	if (!raw_can_connect ()) {	/*  work-around for buggy kernels  */
 	    close (raw_sk);
 	    raw_sk = socket (af, SOCK_RAW, IPPROTO_TCP);
@@ -244,6 +253,7 @@ static int tcp_init (const sockaddr_any *dest,
 
 	use_recverr (raw_sk);
 
+	/*将raw_sk加入poll中*/
 	add_poll (raw_sk, POLLIN | POLLERR);
 
 
@@ -372,6 +382,10 @@ static int tcp_init (const sockaddr_any *dest,
 }
 
 
+/*发送指定ttl的tcp探测报文
+ * 在init时，我们创建raw socket,这里为了保证srcport没有被占用，创建tcp socket
+ * 进行占用。
+ * */
 static void tcp_send_probe (probe *pb, int ttl) {
 	int sk;
 	int af = dest_addr.sa.sa_family;
@@ -422,8 +436,10 @@ static void tcp_send_probe (probe *pb, int ttl) {
 	}
 
 
+	/*记录发送时间*/
 	pb->send_time = get_time ();
 
+	/*自raw发送探测报文*/
 	if (do_send (raw_sk, th, th->doff << 2, &dest_addr) < 0) {
 	    close (sk);
 	    pb->send_time = 0;
@@ -438,7 +454,7 @@ static void tcp_send_probe (probe *pb, int ttl) {
 	return;
 }
 
-
+/*响应报文检查*/
 static probe *tcp_check_reply (int sk, int err, sockaddr_any *from,
 						    char *buf, size_t len) {
 	probe *pb;
@@ -458,9 +474,14 @@ static probe *tcp_check_reply (int sk, int err, sockaddr_any *from,
 	}
 
 
+	/*忽略掉与dest_port不同的*/
 	if (dport != dest_port)
 		return NULL;
 
+	/*
+	 * 忽略掉与dest_addr不同的
+	 * （如果这里会走到的话，两者间流量非常大的情况下，是否有问题）
+	 */
 	if (!equal_addr (&dest_addr, from))
 		return NULL;
 
@@ -482,6 +503,7 @@ static probe *tcp_check_reply (int sk, int err, sockaddr_any *from,
 
 static void tcp_recv_probe (int sk, int revents) {
 
+    /*tcp探测只考虑 读，出错两个事件，其它的忽略*/
 	if (!(revents & (POLLIN | POLLERR)))
 		return;
 

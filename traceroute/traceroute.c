@@ -89,13 +89,18 @@ static char version_string[] = "Modern traceroute for Linux, "
 				"\nCopyright (c) 2016  Dmitry Butskoy, "
 				"  License: GPL v2 or any later";
 static int debug = 0;
+/*首包的ttl值*/
 static unsigned int first_hop = 1;
+/*最大跳数*/
 static unsigned int max_hops = DEF_HOPS;
 static unsigned int sim_probes = DEF_SIM_PROBES;
+/*每跳对应的控测数目*/
 static unsigned int probes_per_hop = DEF_NUM_PROBES;
 
 static char **gateways = NULL;
+/*gateway的数量*/
 static int num_gateways = 0;
+/*ipoption选项*/
 static unsigned char *rtbuf = NULL;
 static size_t rtbuf_len = 0;
 static unsigned int ipv6_rthdr_type = 2;	/*  IPV6_RTHDR_TYPE_2   */
@@ -108,6 +113,7 @@ static int noresolve = 0;
 static int extension = 0;
 static int as_lookups = 0;
 static unsigned int dst_port_seq = 0;
+/*探测使用的tos*/
 static unsigned int tos = 0;
 static unsigned int flow_label = 0;
 static int noroute = 0;
@@ -122,10 +128,12 @@ static int backward = 0;
 
 static sockaddr_any dst_addr = {{ 0, }, };
 static char *dst_name = NULL;
+/*指定在哪个设备上进行探测*/
 static char *device = NULL;
 static sockaddr_any src_addr = {{ 0, }, };
 static unsigned int src_port = 0;
 
+/*使用哪个模块进行traceroute*/
 static const char *module = "default";
 static const tr_module *ops = NULL;
 
@@ -134,6 +142,7 @@ static unsigned int opts_idx = 1;	/*  first one reserved...   */
 static int jsonoutput = 0;
 static int jsonprobe_nr = 0;
 
+/*使用ipv4/ipv6协议*/
 static int af = 0;
 
 static probe *probes = NULL;
@@ -176,6 +185,7 @@ static void check_progname (const char *name) {
 	const char *p;
 	int l;
 
+	/*去取目录，只保留程序名*/
 	p = strrchr (name, '/');
 	if (p)  p++;
 	else  p = name;
@@ -184,9 +194,11 @@ static void check_progname (const char *name) {
 	if (l <= 0)  return;
 	l--;
 
+	/*如果最后一个字符为6，则指明ipv6协议，否则ipv4*/
 	if (p[l] == '6')  af = AF_INET6;
 	else if (p[l] == '4')  af = AF_INET;
 
+	/*如果名称为tcp开头，则使用module为tcp*/
 	if (!strncmp (p, "tcp", 3))
 		module = "tcp";
 	if (!strncmp (p, "tracert", 7))
@@ -266,9 +278,11 @@ static void init_ip_options (void) {
 	sockaddr_any *gates;
 	int i, max;
 
+	/*没有指定gateway,退出*/
 	if (!num_gateways)
 		return;
 
+	/*设置gateways地址*/
 	/*  check for TYPE,ADDR,ADDR... form   */
 	if (af == AF_INET6 && num_gateways > 1 && gateways[0]) {
 	    char *q;
@@ -365,6 +379,7 @@ static int set_af (CLIF_option *optn, char *arg) {
 	return 0;
 }
 
+/*设置gateway地址*/
 static int add_gateway (CLIF_option *optn, char *arg) {
 
 	if (num_gateways >= MAX_GATEWAYS_6) {	/*  127 > 8 ... :)   */
@@ -379,11 +394,13 @@ static int add_gateway (CLIF_option *optn, char *arg) {
 	return 0;
 }
 
+/*设置源ip*/
 static int set_source (CLIF_option *optn, char *arg) {
 
 	return  getaddr (arg, &src_addr);
 }
 
+/*解析并设置port*/
 static int set_port (CLIF_option *optn, char *arg) {
 	unsigned int *up = (unsigned int *) optn->data;
 	char *q;
@@ -399,6 +416,7 @@ static int set_port (CLIF_option *optn, char *arg) {
 	return 0;
 }
 
+/*设置需要使能的module名称*/
 static int set_module (CLIF_option *optn, char *arg) {
 
 	module = (char *) optn->data;
@@ -488,15 +506,19 @@ static CLIF_option option_list[] = {
 			CLIF_set_flag, &dontfrag, 0, CLIF_ABBREV },
 	{ "f", "first", "first_ttl", "Start from the %s hop (instead from 1)",
 			CLIF_set_uint, &first_hop, 0, 0 },
+	/*指定报文通过指定网关*/
 	{ "g", "gateway", "gate", "Route packets through the specified gateway "
 			    "(maximum " _TEXT(MAX_GATEWAYS_4) " for IPv4 and "
 			    _TEXT(MAX_GATEWAYS_6) " for IPv6)",
 			add_gateway, 0, 0, CLIF_SEVERAL },
+	/*-I 使能icmp模块*/
 	{ "I", "icmp", 0, "Use ICMP ECHO for tracerouting",
 			set_module, "icmp", 0, 0 },
+	/*-T 使能tcp模块*/
 	{ "T", "tcp", 0, "Use TCP SYN for tracerouting (default "
 			"port is " _TEXT(DEF_TCP_PORT) ")",
 			set_module, "tcp", 0, 0 },
+	/*-i 指定在哪个设备上执行探测*/
 	{ "i", "interface", "device", "Specify a network interface "
 			    "to operate with",
 			CLIF_set_string, &device, 0, 0 },
@@ -509,6 +531,7 @@ static CLIF_option option_list[] = {
 			CLIF_set_uint, &sim_probes, 0, 0 },
 	{ "n", 0, 0, "Do not resolve IP addresses to their domain names",
 			CLIF_set_flag, &noresolve, 0, 0 },
+	/*-p指定目的port*/
 	{ "p", "port", "port", "Set the destination port to use. "
 			    "It is either initial udp port value for "
 			    "\"default\" method (incremented by each probe, "
@@ -519,6 +542,7 @@ static CLIF_option option_list[] = {
 			    _TEXT(DEF_TCP_PORT) " for \"tcp\", "
 			    _TEXT(DEF_UDP_PORT) " for \"udp\", etc.)",
 			    set_port, &dst_port_seq, 0, 0 },
+	/*-t 指定探测时使用的tos*/
 	{ "t", "tos", "tos", "Set the TOS (IPv4 type of service) or TC "
 			    "(IPv6 traffic class) value for outgoing packets",
 			    CLIF_set_uint, &tos, 0, 0 },
@@ -538,8 +562,10 @@ static CLIF_option option_list[] = {
 	{ "r", 0, 0, "Bypass the normal routing and send directly to a host "
 			    "on an attached network",
 			    CLIF_set_flag, &noroute, 0, 0 },
+	/*-s指定发送时源ip*/
 	{ "s", "source", "src_addr", "Use source %s for outgoing packets",
 			    set_source, 0, 0, 0 },
+	/*-z 两次发送探测的发送间隔*/
 	{ "z", "sendwait", "sendwait", "Minimal time interval between probes "
 			    "(default " _TEXT(DEF_SEND_SECS) "). If the value "
 			    "is more than 10, then it specifies a number "
@@ -562,6 +588,7 @@ static CLIF_option option_list[] = {
 			    "by comma. If %s is \"help\", print info about "
 			    "available options",
 			    set_mod_option, 0, 0, CLIF_SEVERAL | CLIF_EXTRA },
+	/*--sport 用于指定源端口*/
 	{ 0, "sport", "num", "Use source port %s for outgoing packets. "
 			    "Implies `-N 1'",
 			    set_port, &src_port, 0, CLIF_EXTRA },
@@ -569,13 +596,16 @@ static CLIF_option option_list[] = {
 	{ 0, "fwmark", "num", "Set firewall mark for outgoing packets",
 			    CLIF_set_uint, &fwmark, 0, 0 },
 #endif
+	/*-U 使能udp模块*/
 	{ "U", "udp", 0, "Use UDP to particular port for tracerouting "
 			    "(instead of increasing the port per each probe), "
 			    "default port is " _TEXT(DEF_UDP_PORT),
 			    set_module, "udp", 0, CLIF_EXTRA },
+	/*-UL 使能udplite模块*/
 	{ 0, "UL", 0, "Use UDPLITE for tracerouting (default dest port is "
 			    _TEXT(DEF_UDP_PORT) ")",
 			    set_module, "udplite", 0, CLIF_ONEDASH|CLIF_EXTRA },
+	/*-D 使能dccp模块*/
 	{ "D", "dccp", 0, "Use DCCP Request for tracerouting (default "
 			    "port is " _TEXT(DEF_DCCP_PORT) ")",
 			    set_module, "dccp", 0, CLIF_EXTRA },
@@ -588,6 +618,7 @@ static CLIF_option option_list[] = {
 	{ 0, "back", 0, "Guess the number of hops in the backward path "
 			    "and print if it differs",
 			    CLIF_set_flag, &backward, 0, CLIF_EXTRA },
+	/*指明需要采用json输出*/
 	{ "j", "json", 0, "Output json output",
 				CLIF_set_flag, &jsonoutput, 0, 0 },
 
@@ -599,6 +630,7 @@ static CLIF_option option_list[] = {
 static CLIF_argument arg_list[] = {
         { "host", "The host to traceroute to",
 				set_host, 0, CLIF_STRICT },
+	/*控测报文总长度*/
 	{ "packetlen", "The full packet length (default is the length of "
 			"an IP header plus " _TEXT(DEF_DATA_LEN) "). Can be "
 			"ignored or increased to a minimal allowed value",
@@ -609,6 +641,7 @@ static CLIF_argument arg_list[] = {
 
 static void do_it (void);
 
+/*traceroute入口*/
 int main (int argc, char *argv[]) {
 
 	setlocale (LC_ALL, "");
@@ -622,14 +655,18 @@ int main (int argc, char *argv[]) {
 	)  exit (2);
 
 
+	/*按用户指定的模块，返回相应的ops*/
 	ops = tr_get_module (module);
 	if (!ops)  ex_error ("Unknown traceroute module %s", module);
 
 
+	/*首包的ttl不能为0，且不得大于max_hops*/
 	if (!first_hop || first_hop > max_hops)
 		ex_error ("first hop out of range");
+	/*最大跳数过大*/
 	if (max_hops > MAX_HOPS)
 		ex_error ("max hops cannot be more than " _TEXT(MAX_HOPS));
+	/*每跳对应的控测数目不得大于最大探测数目*/
 	if (!probes_per_hop || probes_per_hop > MAX_PROBES)
 		ex_error ("no more than " _TEXT(MAX_PROBES) " probes per hop");
 	if (wait_secs < 0 || here_factor < 0 || near_factor < 0)
@@ -637,6 +674,8 @@ int main (int argc, char *argv[]) {
 				    wait_secs, here_factor, near_factor);
 	if (packet_len > MAX_PACKET_LEN)
 		ex_error ("too big packetlen %d specified", packet_len);
+
+	/*源ip必须与协议族一致*/
 	if (src_addr.sa.sa_family && src_addr.sa.sa_family != af)
 		ex_error ("IP version mismatch in addresses specified");
 	if (send_secs < 0)
@@ -687,17 +726,20 @@ int main (int argc, char *argv[]) {
 	}
 
 
+	/*获得总探测数*/
 	num_probes = max_hops * probes_per_hop;
 	probes = calloc (num_probes, sizeof (*probes));
 	if (!probes)  error ("calloc");
 
 
+	/*解析module对应的参数*/
 	if (ops->options && opts_idx > 1) {
 	    opts[0] = strdup (module);	    /*  aka argv[0] ...  */
 	    if (CLIF_parse (opts_idx, opts, ops->options, 0, CLIF_KEYWORD) < 0)
 		    exit (2);
 	}
 
+	/*实现module初始化*/
 	if (ops->init (&dst_addr, dst_port_seq, &data_len) < 0)
 		ex_error ("trace method's init failed");
 
@@ -726,6 +768,7 @@ static void print_header (void) {
 	}
 	else 
 	{
+	    /*指明traceroute要探测哪个主机，探测最大跳数，探测报文大小*/
 		printf ("traceroute to %s (%s), %u hops max, %zu byte packets",
 			dst_name, addr2str (&dst_addr), max_hops,
 			header_len + data_len);
@@ -1098,7 +1141,9 @@ probe *probe_by_sk (int sk) {
 	return NULL;
 }
 
-
+/**
+ * poll收到响应
+ */
 static void poll_callback (int fd, int revents) {
 
 	ops->recv_probe (fd, revents);
@@ -1110,6 +1155,7 @@ static void do_it (void) {
 	int end = num_probes;
 	double last_send = 0;
 
+	/*显示信息头部*/
 	print_header ();
 
 
@@ -1155,20 +1201,25 @@ static void do_it (void) {
 		}
 
 
+		/*此pb的send_time没有填写，即还没有发送过探测*/
 		if (!pb->send_time) {
 		    int ttl;
 		    double next;
 
+		    /*如果用户指定了send_secs，则计算下次发送时间*/
 		    if (send_secs && (next = last_send + send_secs) > now_time) {
 			next_time = next;
 			break;
 		    }
 
+		    /*本次探测对应的ttl（由于每个ttl会探测多次，故先除）*/
 		    ttl = n / probes_per_hop + 1;
 
+		    /*执行ttl探测*/
 		    ops->send_probe (pb, ttl);
 
 		    if (!pb->send_time) {
+		        /*探测报文没有发送，如果有下次发送，则跳出，否则报错*/
 			if (next_time)  break;	/*  have chances later   */
 			else  error ("send probe");
 		    }
@@ -1177,6 +1228,7 @@ static void do_it (void) {
 		}
 
 
+		/*依据超时时间计算下次发送时间*/
 		if (!next_time)
 		    next_time = pb->send_time + get_timeout (pb);
 
@@ -1185,6 +1237,7 @@ static void do_it (void) {
 	    }
 
 
+	    /*需要下次探测，则poll等待，并处理响应*/
 	    if (next_time) {
 		double timeout = next_time - get_time ();
 
@@ -1221,6 +1274,7 @@ void tune_socket (int sk) {
 #endif
 
 
+	/*设置ip options*/
 	if (rtbuf && rtbuf_len) {
 	    if (af == AF_INET) {
 		if (setsockopt (sk, IPPROTO_IP, IP_OPTIONS,
@@ -1246,6 +1300,7 @@ void tune_socket (int sk) {
 		 setsockopt (sk, SOL_IP, IP_MTU_DISCOVER, &i, sizeof(i)) < 0))
 	    )  error ("setsockopt IP_MTU_DISCOVER");
 
+	    /*设置socket对应的tos*/
 	    if (tos) {
 		i = tos;
 		if (setsockopt (sk, SOL_IP, IP_TOS, &i, sizeof (i)) < 0)
@@ -1301,10 +1356,12 @@ void tune_socket (int sk) {
 	}
 
 
+	/*设置时间签*/
 	use_timestamp (sk);
 
 	use_recv_ttl (sk);
 
+	/*指定为不阻塞*/
 	fcntl (sk, F_SETFL, O_NONBLOCK);
 
 	return;
@@ -1461,7 +1518,7 @@ void probe_done (probe *pb) {
 }
 
 
-void recv_reply (int sk, int err, check_reply_t check_reply) {
+void recv_reply (int sk, int err/*是否收到出错报文*/, check_reply_t check_reply) {
 	struct msghdr msg;
 	sockaddr_any from;
 	struct iovec iov;
@@ -1487,6 +1544,7 @@ void recv_reply (int sk, int err, check_reply_t check_reply) {
 	msg.msg_iovlen = 1;
 
 
+	/*收取报文*/
 	n = recvmsg (sk, &msg, err ? MSG_ERRQUEUE : 0);
 	if (n < 0)  return;
 
@@ -1502,6 +1560,7 @@ void recv_reply (int sk, int err, check_reply_t check_reply) {
 	    */
 	    ops->header_len == 0
 	) {
+	    /*跳过ip头*/
 	    struct iphdr *ip = (struct iphdr *) bufp;
 	    int hlen;
 
@@ -1662,12 +1721,14 @@ int equal_addr (const sockaddr_any *a, const sockaddr_any *b) {
 void bind_socket (int sk) {
 	sockaddr_any *addr, tmp;
 
+	/*绑定指定设备*/
 	if (device) {
 	    if (setsockopt (sk, SOL_SOCKET, SO_BINDTODEVICE,
 					device, strlen (device) + 1) < 0
 	    )  error ("setsockopt SO_BINDTODEVICE");
 	}
 
+	/*绑定源ip*/
 	if (!src_addr.sa.sa_family) {
 	    memset (&tmp, 0, sizeof (tmp));
 	    tmp.sa.sa_family = af;
