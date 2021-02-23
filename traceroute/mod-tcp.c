@@ -510,7 +510,7 @@ static void tcp_recv_probe (int sk, int revents) {
 	recv_reply (sk, !!(revents & POLLERR), tcp_check_reply);
 }
 
-
+/*将probe移除掉*/
 static void tcp_expire_probe (probe *pb) {
 
 	probe_done (pb);

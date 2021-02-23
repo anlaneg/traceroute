@@ -25,7 +25,7 @@ static sockaddr_any dest_addr = {{ 0, }, };
 
 static int icmp_sk = -1;
 
-
+/*创建icmp socket*/
 static int tcp_init (const sockaddr_any *dest,
 			    unsigned int port_seq, size_t *packet_len_p) {
 	int af = dest->sa.sa_family;
@@ -55,7 +55,7 @@ static int tcp_init (const sockaddr_any *dest,
 	return 0;
 }
 
-
+/*执行tcp连接*/
 static void tcp_send_probe (probe *pb, int ttl) {
 	int sk;
 	int af = dest_addr.sa.sa_family;
