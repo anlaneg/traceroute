@@ -123,7 +123,7 @@ static void udp_send_probe (probe *pb, int ttl) {
 	int sk;
 	int af = dest_addr.sa.sa_family;
 
-
+	/*创建socket*/
 	sk = socket (af, SOCK_DGRAM, protocol);
 	if (sk < 0)  error ("socket");
 
@@ -131,8 +131,8 @@ static void udp_send_probe (probe *pb, int ttl) {
 
 	if (coverage)  set_coverage (sk);	/*  udplite case   */
 
+	/*设置ttl*/
 	set_ttl (sk, ttl);
-
 
 	if (connect (sk, &dest_addr.sa, sizeof (dest_addr)) < 0)
 		error ("connect");
@@ -151,10 +151,13 @@ static void udp_send_probe (probe *pb, int ttl) {
 
 	pb->sk = sk;
 
+	/*将socket加入到poll中，等待事件触发*/
 	add_poll (sk, POLLIN | POLLERR);
 
+	/*将端口号赋给seq*/
 	pb->seq = dest_addr.sin.sin_port;
 
+	/*增加port序号*/
 	if (curr_port) {	/*  traditional udp method   */
 	    curr_port++;
 	    dest_addr.sin.sin_port = htons (curr_port);	/* both ipv4 and ipv6 */
@@ -179,13 +182,14 @@ static probe *udp_check_reply (int sk, int err, sockaddr_any *from,
 	return pb;
 }
 
-
+/*udp探测报文接收*/
 static void udp_recv_probe (int sk, int revents) {
 
 	if (!(revents & (POLLIN | POLLERR)))
+	    /*仅处理read事件，err事件*/
 		return;
 
-	recv_reply (sk, !!(revents & POLLERR), udp_check_reply);
+	recv_reply (sk, !!(revents & POLLERR)/*是否error*/, udp_check_reply);
 }
 
 

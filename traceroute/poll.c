@@ -14,8 +14,9 @@
 
 #include "traceroute.h"
 
-
+/*poll关心的fds*/
 static struct pollfd *pfd = NULL;
+/*pfd中socket数目*/
 static unsigned int num_polls = 0;
 
 /*向poll数组中添加fd，设置其关心的事件*/
@@ -82,6 +83,7 @@ void do_poll (double timeout, void (*callback) (int fd, int revents)) {
 	    /*执行回调*/
 	    for (i = 0; n && i < num_polls; i++) {
 		if (pfd[i].revents) {
+		    /*触发事件回调*/
 		    callback (pfd[i].fd, pfd[i].revents);
 		    n--;
 		}

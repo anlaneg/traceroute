@@ -25,7 +25,7 @@ struct probe_struct {
 	double send_time;/*探测报文发送时时间*/
 	double recv_time;
 	int recv_ttl;
-	int sk;
+	int sk;/*探测用socket*/
 	int seq;/*探测序列*/
 	char *ext;
 	char err_str[16];	/*  assume enough   */
@@ -42,7 +42,7 @@ struct tr_module_struct {
 				unsigned int port_seq/*探测端口*/, size_t *packet_len/*探测报文数据长度*/);
 	/*探测报文发送*/
 	void (*send_probe) (probe *pb, int ttl);
-	/*fd收到事件，进行处理*/
+	/*探测报文发送后，对端响应，fd收到事件，进行处理*/
 	void (*recv_probe) (int fd, int revents);
 	void (*expire_probe) (probe *pb);
 	/*模块自定义的选项*/

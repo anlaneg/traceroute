@@ -108,6 +108,7 @@ static unsigned int ipv6_rthdr_type = 2;	/*  IPV6_RTHDR_TYPE_2   */
 static size_t header_len = 0;
 static size_t data_len = 0;
 
+/*不容许分片*/
 static int dontfrag = 0;
 static int noresolve = 0;
 static int extension = 0;
@@ -130,6 +131,7 @@ static sockaddr_any dst_addr = {{ 0, }, };
 static char *dst_name = NULL;
 /*指定在哪个设备上进行探测*/
 static char *device = NULL;
+/*设置源ip*/
 static sockaddr_any src_addr = {{ 0, }, };
 static unsigned int src_port = 0;
 
@@ -500,6 +502,7 @@ static int set_host (CLIF_argument *argm, char *arg, int index) {
 static CLIF_option option_list[] = {
 	{ "4", 0, 0, "Use IPv4", set_af, (void *) 4, 0, CLIF_EXTRA },
 	{ "6", 0, 0, "Use IPv6", set_af, (void *) 6, 0, 0 },
+	/*开启socket级别debug功能*/
 	{ "d", "debug", 0, "Enable socket level debugging",
 			CLIF_set_flag, &debug, 0, 0 },
 	{ "F", "dont-fragment", 0, "Do not fragment packets",
@@ -1243,7 +1246,7 @@ static void do_it (void) {
 
 		if (timeout < 0)  timeout = 0;
 
-		do_poll (timeout, poll_callback);
+		do_poll (timeout, poll_callback/*poll回调执行*/);
 	    }
 
 	}
@@ -1258,6 +1261,7 @@ static void do_it (void) {
 void tune_socket (int sk) {
 	int i = 0;
 
+	/*socket开启debug*/
 	if (debug) {
 	    i = 1;
 	    if (setsockopt (sk, SOL_SOCKET, SO_DEBUG, &i, sizeof (i)) < 0)
@@ -1265,6 +1269,7 @@ void tune_socket (int sk) {
 	}
 
 
+	/*指定skb对应的fwmark*/
 #ifdef SO_MARK
 	if (fwmark) {
 	    if (setsockopt (sk, SOL_SOCKET, SO_MARK,
@@ -1288,12 +1293,11 @@ void tune_socket (int sk) {
 	    }
 	}
 
-
+	/*绑定socket ip*/
 	bind_socket (sk);
 
 
 	if (af == AF_INET) {
-
 	    i = dontfrag ? IP_PMTUDISC_PROBE : IP_PMTUDISC_DONT;
 	    if (setsockopt (sk, SOL_IP, IP_MTU_DISCOVER, &i, sizeof(i)) < 0 &&
 		(!dontfrag || (i = IP_PMTUDISC_DO,
@@ -1503,7 +1507,7 @@ static void parse_local_res (probe *pb, int ee_errno, int info) {
 	error ("local recverr");
 }
 
-
+/*socket fd移除关闭*/
 void probe_done (probe *pb) {
 
 	if (pb->sk) {
@@ -1564,11 +1568,13 @@ void recv_reply (int sk, int err/*是否收到出错报文*/, check_reply_t chec
 	    struct iphdr *ip = (struct iphdr *) bufp;
 	    int hlen;
 
+	    /*报文长度不足ip头，放弃*/
 	    if (n < sizeof (struct iphdr))  return;
 
 	    hlen = ip->ihl << 2;
 	    if (n < hlen)  return;
 
+	    /*跳过ip头部*/
 	    bufp += hlen;
 	    n -= hlen;
 	}
@@ -1717,7 +1723,7 @@ int equal_addr (const sockaddr_any *a, const sockaddr_any *b) {
 	return 0;	/*  not reached   */
 }
 
-
+/*设置socket源ip绑定*/
 void bind_socket (int sk) {
 	sockaddr_any *addr, tmp;
 
@@ -1775,7 +1781,7 @@ void use_recverr (int sk) {
 	}
 }
 
-
+/*设置socket对应的ttl*/
 void set_ttl (int sk, int ttl) {
 
 	if (af == AF_INET) {
@@ -1789,7 +1795,7 @@ void set_ttl (int sk, int ttl) {
 	}
 }
 
-
+/*向指定地址发送报文*/
 int do_send (int sk, const void *data, size_t len, const sockaddr_any *addr) {
 	int res;
 
@@ -1822,6 +1828,7 @@ int raw_can_connect (void) {
 	if (can_connect < 0) {
 
 	    if (af == AF_INET)
+	        /*ipv4协议没问题*/
 		    can_connect = 1;
 	    else {	/*  AF_INET6   */
 		struct utsname uts;
@@ -1832,6 +1839,7 @@ int raw_can_connect (void) {
 			return 0;
 
 		n = sscanf (uts.release, "%u.%u.%u.%u", &a, &b, &c, &d);
+		/*ipv6协议,linux版本大于2.6.25则没问题*/
 		can_connect = (n >= 3 && VER (a, b, c, d) >= VER (2, 6, 25, 0));
 	    }
 	}
