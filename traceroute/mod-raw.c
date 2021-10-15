@@ -67,6 +67,7 @@ static int raw_init (const sockaddr_any *dest,
 
 	length_p = packet_len_p;
 
+	/*填充traceroute负载*/
 	if (*length_p &&
 	    !(data = malloc (*length_p))
 	)  error ("malloc");

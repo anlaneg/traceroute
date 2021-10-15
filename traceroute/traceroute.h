@@ -21,7 +21,7 @@ typedef union common_sockaddr sockaddr_any;
 struct probe_struct {
 	int done;
 	int final;
-	sockaddr_any res;
+	sockaddr_any res;/*响应报文来源的地址*/
 	double send_time;/*探测报文发送时时间*/
 	double recv_time;
 	int recv_ttl;

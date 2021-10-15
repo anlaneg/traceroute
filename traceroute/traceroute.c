@@ -147,6 +147,7 @@ static int jsonprobe_nr = 0;
 /*使用ipv4/ipv6协议*/
 static int af = 0;
 
+/*记录具体的每次探测过程及结果的数组*/
 static probe *probes = NULL;
 static unsigned int num_probes = 0;
 
@@ -532,6 +533,7 @@ static CLIF_option option_list[] = {
 			    "to be tried simultaneously (default is "
 			    _TEXT(DEF_SIM_PROBES) ")",
 			CLIF_set_uint, &sim_probes, 0, 0 },
+			/*-n 不将ip地址反转为域名*/
 	{ "n", 0, 0, "Do not resolve IP addresses to their domain names",
 			CLIF_set_flag, &noresolve, 0, 0 },
 	/*-p指定目的port*/
@@ -559,6 +561,7 @@ static CLIF_option option_list[] = {
 			    _TEXT(DEF_WAIT_SECS) ") seconds "
 			    "(float point values allowed too)",
 			    set_wait_specs, 0, 0, 0 },
+	/*每次发送探测多少个*/
 	{ "q", "queries", "nqueries", "Set the number of probes per each hop. "
 			    "Default is " _TEXT(DEF_NUM_PROBES),
 			    CLIF_set_uint, &probes_per_hop, 0, 0 },
@@ -746,7 +749,7 @@ int main (int argc, char *argv[]) {
 	if (ops->init (&dst_addr, dst_port_seq, &data_len) < 0)
 		ex_error ("trace method's init failed");
 
-
+	/*实现模块探测*/
 	do_it ();
 
 	return 0;
@@ -786,11 +789,13 @@ static void print_addr (sockaddr_any *res) {
 	if (!res->sa.sa_family)
 		return;
 
+	/*地址转字符串*/
 	str = addr2str (res);
 
 
 	if (noresolve)
 	{
+	    /*不反向解析dns情况*/
 		if(jsonoutput)
 			printf (", \"ip\":\"%s\"", str);
 		else 
@@ -820,17 +825,19 @@ static void print_addr (sockaddr_any *res) {
 
 }
 
+/*显示traceroute结果*/
 static void print_probe (probe *pb) {
-	unsigned int idx = (pb - probes);
+	unsigned int idx = (pb - probes);/*探测序号*/
 	unsigned int ttl = idx / probes_per_hop + 1;
 	unsigned int np = idx % probes_per_hop;
 
+	/*如果每跳探测probes_per_hop次，则首次显示ttl*/
 	if (np == 0)
 		printf ("\n%2u ", ttl);
 
 
 	if (!pb->res.sa.sa_family)
-		printf (" *");
+		printf (" *");/*此探测没有收到响应*/
 	else {
 		int prn = !np;	/*  print if the first...  */
 
@@ -849,6 +856,7 @@ static void print_probe (probe *pb) {
 		}
 
 		if (prn) {
+		    /*显示响应方的地址*/
 			print_addr (&pb->res);
 
 			if (pb->ext)  printf (" <%s>", pb->ext);
@@ -861,12 +869,14 @@ static void print_probe (probe *pb) {
 	}
 
 
+	/*显示请求与响应间隔*/
 	if (pb->recv_time) {
 		double diff = pb->recv_time - pb->send_time;
 
 		printf ("  %.3f ms", diff * 1000);
 	}
 
+	/*显示返回的错误信息*/
 	if (pb->err_str[0])
 		printf (" %s", pb->err_str);
 
@@ -1161,7 +1171,7 @@ static void do_it (void) {
 	/*显示信息头部*/
 	print_header ();
 
-
+	/*执行所有探测*/
 	while (start < end) {
 	    int n, num = 0;
 	    double next_time = 0;
@@ -1389,13 +1399,13 @@ void parse_icmp_res (probe *pb, int type, int code, int info) {
 		    case ICMP_UNREACH_NET_UNKNOWN:
 		    case ICMP_UNREACH_ISOLATED:
 		    case ICMP_UNREACH_TOSNET:
-			    str = "!N";
+			    str = "!N";/*网络不可达*/
 			    break;
 
 		    case ICMP_UNREACH_HOST:
 		    case ICMP_UNREACH_HOST_UNKNOWN:
 		    case ICMP_UNREACH_TOSHOST:
-			    str = "!H";
+			    str = "!H";/*主机不可达*/
 			    break;
 
 		    case ICMP_UNREACH_NET_PROHIB:
@@ -1406,7 +1416,7 @@ void parse_icmp_res (probe *pb, int type, int code, int info) {
 
 		    case ICMP_UNREACH_PORT:
 			    /*  dest host is reached   */
-			    str = "";
+			    str = "";/*端口不可达*/
 			    break;
 
 		    case ICMP_UNREACH_PROTOCOL:
@@ -1480,11 +1490,13 @@ void parse_icmp_res (probe *pb, int type, int code, int info) {
 
 
 	if (!str) {
+	    /*向buffer中填充不识别的type,code*/
 	    snprintf (buf, sizeof (buf), "!<%u-%u>", type, code);
 	    str = buf;
 	}
 
 	if (*str) {
+	    /*填充的返回的错误信息*/
 	    strncpy (pb->err_str, str, sizeof (pb->err_str));
 	    pb->err_str[sizeof (pb->err_str) - 1] = '\0';
 	}
@@ -1646,6 +1658,7 @@ void recv_reply (int sk, int err/*是否收到出错报文*/, check_reply_t chec
 
 
 	if (!err)
+	    /*记录响应返回来源的地址*/
 	    memcpy (&pb->res, &from, sizeof (pb->res));
 
 	pb->recv_time = recv_time;
@@ -1654,6 +1667,7 @@ void recv_reply (int sk, int err/*是否收到出错报文*/, check_reply_t chec
 
 	if (ee && ee->ee_origin != SO_EE_ORIGIN_LOCAL) {    /*  icmp or icmp6   */
 	    memcpy (&pb->res, SO_EE_OFFENDER (ee), sizeof(pb->res));
+	    /*解析icmp错误*/
 	    parse_icmp_res (pb, ee->ee_type, ee->ee_code, ee->ee_info);
 	}
 

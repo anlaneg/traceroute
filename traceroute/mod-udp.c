@@ -31,9 +31,9 @@ static sockaddr_any dest_addr = {{ 0, }, };
 static unsigned int curr_port = 0;
 static unsigned int protocol = IPPROTO_UDP;
 
-
+/*指向申请的报文负载*/
 static char *data = NULL;
-static size_t *length_p;
+static size_t *length_p;/*报文长度*/
 
 static void fill_data (size_t *packet_len_p) {
 	int i;
@@ -44,16 +44,18 @@ static void fill_data (size_t *packet_len_p) {
 	    !(data = malloc (*length_p))
 	)  error ("malloc");
 
+	/*填充报文0x40,0x41,0x42....*/
         for (i = 0; i < *length_p; i++)
                 data[i] = 0x40 + (i & 0x3f);
  
 	return;
 }
 
-
+/*初始化port及报文负载*/
 static int udp_default_init (const sockaddr_any *dest,
 				unsigned int port_seq, size_t *packet_len_p) {
 
+    /*未指供port_seq时，以DEF_START_PORT为准*/
 	curr_port = port_seq ? port_seq : DEF_START_PORT;
 
 	dest_addr = *dest;
@@ -118,7 +120,7 @@ static int udplite_init (const sockaddr_any *dest,
 	return 0;
 }
 
-
+/*udp发送探测报文*/
 static void udp_send_probe (probe *pb, int ttl) {
 	int sk;
 	int af = dest_addr.sa.sa_family;
@@ -142,7 +144,8 @@ static void udp_send_probe (probe *pb, int ttl) {
 
 	pb->send_time = get_time ();
 
-	if (do_send (sk, data, *length_p, NULL) < 0) {
+	/*发送报文负载*/
+	if (do_send (sk, data/*报文负载*/, *length_p/*报文长度*/, NULL) < 0) {
 	    close (sk);
 	    pb->send_time = 0;
 	    return;
