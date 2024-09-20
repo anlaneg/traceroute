@@ -804,6 +804,7 @@ static void print_addr (sockaddr_any *res) {
 	else {
 	    char buf[1024];
 
+	    /*显示ip的名称*/
 	    buf[0] = '\0';
 	    getnameinfo (&res->sa, sizeof (*res), buf, sizeof (buf),
 							    0, 0, NI_IDN);
